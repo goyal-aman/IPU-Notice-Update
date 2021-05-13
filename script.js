@@ -2,8 +2,8 @@ let puppeteer = require("puppeteer");
 let cheerio = require("cheerio");
 let request = require("request");
 let fs = require("fs");
-const { write } = require("fs/promises");
 
+// updating default.json with Latest Notices .
 getNoticeUpdate();
 
 async function getNoticeUpdate(){
@@ -46,4 +46,33 @@ function writeToFile(data, file_name='default.json'){
         }
         console.log("Done!.")
     })
+}
+function readFile(file_name='default.json'){
+    let fileData = fs.readFileSync(file_name);
+    return JSON.parse(fileData);
+}
+
+function JsonToText(JsonObj){
+    // converts JSON data in JsonObj
+    // to text format, so that it can be 
+    // attached to mail or any input filed.
+
+    let text = "";
+    for(let i=0; i<JsonObj.length; i++){
+        let notice = JsonObj[i];
+
+        // adding notice text to text.
+        text += "Notice: " + notice['NoticeText']+".\n";
+        
+        // adding date.
+        text += "Date: "+ notice["Date"]+"\n";
+        
+        // adding notice url.
+        text += "Link: "+ notice['href']+"\n";
+        
+        // adding a new line to easily differentiate b/w notices.
+        text += "\n";
+    }
+    console.log(text);
+    return text;
 }
