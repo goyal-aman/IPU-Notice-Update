@@ -3,13 +3,75 @@ let cheerio = require("cheerio");
 let request = require("request");
 let fs = require("fs");
 
+
+// TODO ADD utility method to fetch email and pass from env vars
+// FROM_EMAIL:
+// PASSSWROD:
+
 // updating default.json with Latest Notices .
-getNoticeUpdate();
+getNoticeUpdate()
+
+
+async function mailToSubscriber(){
+    // function to send new notices to 
+    // subscribers of the mailing list.
+    let browser = await puppeteer.launch({
+        headless: false,
+        defaultViewport: null,
+        args: ["--start-maximized"],
+    });
+    let pages = await browser.pages();
+    page = pages[0]
+    
+    // login to gmail.
+    await LoginToGmail();
+
+    // compose mail.
+    await sendEmail();
+    
+}
+
+async function sendEmail() {
+    let compose_url = "https://mail.google.com/mail/u/0/#inbox?compose=new";
+    await page.goto(compose_url);
+
+    // enter email of recipient in the "to" section.
+    await page.waitForSelector('textarea[name="to"]', { visible: true });
+    await page.type('textarea[name="to"]', "goyal.amanrocks@gmail.com");
+    await page.keyboard.press("Enter");
+
+    // press tab twice to get to message body.
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+
+
+    // goto text area and enter text to be sent.
+    let data = readFile();
+    let text = JsonToText(data);
+    await page.type("div[id=':9a']", text);
+    // press control enter to send email
+    await page.keyboard.down("Control");
+    await page.keyboard.press("Enter");
+    await page.keyboard.up("Control");
+}
+
+async function LoginToGmail() {
+    let gmail_url = "https://www.gmail.com";
+    await page.goto(gmail_url);
+    await page.type("input[type='email']", FROM_EMAIL);
+    await page.keyboard.press("Enter");
+    await page.waitForNavigation();
+    await page.waitForSelector("input[name='password']", { visible: true });
+    await page.type("input[name='password']", PASSSWROD);
+    await page.keyboard.press("Enter");
+    await page.waitForNavigation();
+}
 
 async function getNoticeUpdate(){
     let baseUrl = "http://www.ipu.ac.in";
     let url = "http://www.ipu.ac.in/notices.php";
-    request(url, (err, res, body)=>{
+    
+     request(url, async function (err, res, body){
         if(err){
             return;
         }
@@ -37,7 +99,10 @@ async function getNoticeUpdate(){
             links.push({NoticeText, Date, href});
         }
         writeToFile(JSON.stringify(links));
+        await mailToSubscriber();
+
     })
+
 }
 function writeToFile(data, file_name='default.json'){
     fs.writeFileSync(file_name, data, (err)=>{
@@ -75,4 +140,9 @@ function JsonToText(JsonObj){
     }
     console.log(text);
     return text;
+}
+
+async function waitClickNavigate(selector) {
+    await page.waitForSelector(selector, { visible: true })
+    await Promise.all([page.click(selector), page.waitForNavigation()]);
 }
