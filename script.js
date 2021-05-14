@@ -103,6 +103,25 @@ async function getNoticeUpdate(){
 
     })
 
+async function findNewNotice(LatestData){
+    // DataObj is obj to newly fetched info.
+    
+    let oldData = readFile();
+
+    // contains new notices, that are not in old data.
+    let newNotices = {};
+    
+    // for all notices in latestData, if notice is not present in 
+    // old data save it in newNotices.
+    for(let key in LatestData){
+        if(!oldData.hasOwnProperty(key)){
+            newNotices[key] = LatestData[key];
+        }
+    }
+    console.log("Found "+ Object.keys(newNotices).length+ " Notices");
+    writeToFile(JSON.stringify(LatestData));
+    return newNotices;
+}
 }
 function writeToFile(data, file_name='default.json'){
     fs.writeFileSync(file_name, data, (err)=>{
