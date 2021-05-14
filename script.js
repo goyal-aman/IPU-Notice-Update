@@ -5,16 +5,18 @@ let fs = require("fs");
 
 
 // TODO ADD utility method to fetch email and pass from env vars
-// FROM_EMAIL:
-// PASSSWROD:
+FROM_EMAIL="";
+PASSSWROD=""
 
 // updating default.json with Latest Notices .
 getNoticeUpdate()
 
 
-async function mailToSubscriber(){
+async function mailToSubscriber(newNotice){
     // function to send new notices to 
     // subscribers of the mailing list.
+    console.log("Logging into gmail.")
+    await sleep(2000);
     let browser = await puppeteer.launch({
         headless: false,
         defaultViewport: null,
@@ -27,11 +29,13 @@ async function mailToSubscriber(){
     await LoginToGmail();
 
     // compose mail.
-    await sendEmail();
+    console.log("composing email");
+    await sendEmail(newNotice);
+    browser.close();
     
 }
 
-async function sendEmail() {
+async function sendEmail(newNotice) {
     let compose_url = "https://mail.google.com/mail/u/0/#inbox?compose=new";
     await page.goto(compose_url);
 
@@ -42,12 +46,16 @@ async function sendEmail() {
 
     // press tab twice to get to message body.
     await page.keyboard.press("Tab");
+    await page.type('input[name="subjectbox"]', `${Object.keys(newNotice).length} new Updates.`);
+    
     await page.keyboard.press("Tab");
 
 
     // goto text area and enter text to be sent.
     let data = readFile();
-    let text = JsonToText(data);
+    await page.waitForSelector("div[id=':9a']");
+    
+    let text = JsonToText(newNotice)
     await page.type("div[id=':9a']", text);
     // press control enter to send email
     await page.keyboard.down("Control");
@@ -68,9 +76,11 @@ async function LoginToGmail() {
 }
 
 async function getNoticeUpdate(){
+
     let baseUrl = "http://www.ipu.ac.in";
     let url = "http://www.ipu.ac.in/notices.php";
-    
+     console.log("Fetching Latest updates..");
+     await sleep(1000);
      request(url, async function (err, res, body){
         if(err){
             return;
@@ -78,13 +88,12 @@ async function getNoticeUpdate(){
 
         let $ = cheerio.load(body);
         let trTags = []
-        for(let i=1; i<=10; i++){
-            let nthTr = $(`body > div.table-box > table > tbody:nth-child(2) > tr:nth-child(${i})`)
-            trTags.push(nthTr);
+        let rawTrTags = $(`body > div.table-box > table > tbody:nth-child(2) > tr`);
+        for(let i=0; i<10; i++){
+            trTags.push(rawTrTags[i])
         }
 
-
-        let links = [];
+        let map = {};
         for(let i=0; i<trTags.length; i++){
             let tds  = $(trTags[i]).find('td');
             
@@ -96,12 +105,18 @@ async function getNoticeUpdate(){
             let Date = $(td_date).text().trim();;
 
 
-            links.push({NoticeText, Date, href});
+            map[NoticeText] = {NoticeText, Date, href};
         }
-        writeToFile(JSON.stringify(links));
-        await mailToSubscriber();
 
+        let newNotice = await findNewNotice(map);
+
+        if(Object.keys(newNotice).length>0){
+            await sleep(2000);
+            await mailToSubscriber(newNotice);
+        }
     })
+
+}
 
 async function findNewNotice(LatestData){
     // DataObj is obj to newly fetched info.
@@ -122,6 +137,8 @@ async function findNewNotice(LatestData){
     writeToFile(JSON.stringify(LatestData));
     return newNotices;
 }
+function sleep (time) {
+    return new Promise((resolve) => setTimeout(resolve, time));
 }
 function writeToFile(data, file_name='default.json'){
     fs.writeFileSync(file_name, data, (err)=>{
@@ -133,6 +150,7 @@ function writeToFile(data, file_name='default.json'){
 }
 function readFile(file_name='default.json'){
     let fileData = fs.readFileSync(file_name);
+    if(fileData.length==0) return {}
     return JSON.parse(fileData);
 }
 
@@ -142,8 +160,8 @@ function JsonToText(JsonObj){
     // attached to mail or any input filed.
 
     let text = "";
-    for(let i=0; i<JsonObj.length; i++){
-        let notice = JsonObj[i];
+    for (let  key in  JsonObj) {
+        let notice = JsonObj[key];
 
         // adding notice text to text.
         text += "Notice: " + notice['NoticeText']+".\n";
@@ -157,7 +175,6 @@ function JsonToText(JsonObj){
         // adding a new line to easily differentiate b/w notices.
         text += "\n";
     }
-    console.log(text);
     return text;
 }
 
